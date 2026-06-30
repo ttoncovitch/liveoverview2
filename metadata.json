@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Live Overview2",
+  "description": "Análise avançada de produtividade e gerenciamento de pausas de funcionários a partir de relatórios Excel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

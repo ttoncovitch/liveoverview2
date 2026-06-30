@@ -1,0 +1,33 @@
+name: Build Single File HTML
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24.x'
+        
+    - name: Install dependencies
+      run: npm install
+      
+    - name: Build Single HTML File
+      run: npm run build
+      
+    - name: Upload Single HTML File Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: status-checker-pro-html
+        path: dist/index.html
+        retention-days: 7

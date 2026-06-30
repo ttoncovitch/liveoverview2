@@ -1,0 +1,166 @@
+94-        let idleOver = idleDur;
+95-
+96-        if (globalFilterMajorOverbreaks) {
+97-            if (mealOver <= 2) mealOver = 0;
+98-            if (shortOver <= 2) shortOver = 0;
+99-            if (idleOver <= 2) idleOver = 0;
+100-        }
+101-
+102-        const isWcOnly = globalIncludeWc && !globalIncludeIdle && globalTypeFilter === 'all';
+103-        const isIdleOnly = globalIncludeIdle && !globalIncludeWc && globalTypeFilter === 'all';
+104-        const isOverbreakOnly = globalTypeFilter === 'idle_overbreak_wc' && !globalIncludeWc && !globalIncludeIdle;
+105-
+106-        let dailyOverbreak = 0;
+107-        if (activeStatusFilter && activeStatusFilter.id === 'meeting') {
+108-          dailyOverbreak = meetingDur;
+109-        } else if (activeStatusFilter && activeStatusFilter.id === 'moderation') {
+110-          dailyOverbreak = modDur;
+111-        } else if (activeStatusFilter && activeStatusFilter.id === 'non_moderation') {
+112-          dailyOverbreak = nonModDur;
+113-        } else if (activeStatusFilter && activeStatusFilter.id === 'idle') {
+114-          dailyOverbreak = idleOver;
+115-        } else if (activeStatusFilter && activeStatusFilter.id === 'wc') {
+116-          dailyOverbreak = wcOver;
+117-        } else if (activeStatusFilter && activeStatusFilter.id === 'rest') {
+118-          dailyOverbreak = mealOver + shortOver;
+119-        } else if (activeStatusFilter && activeStatusFilter.id === 'wellness') {
+120-          dailyOverbreak = wellnessOver + prayingOver;
+121-        } else if (isWcOnly) {
+122-          dailyOverbreak = wcOver;
+123-        } else if (isIdleOnly) {
+124-          dailyOverbreak = idleOver;
+125-        } else if (isOverbreakOnly) {
+126-          dailyOverbreak = mealOver + shortOver + wellnessOver + prayingOver;
+127-        } else {
+128-          // Combined or Default
+129-          dailyOverbreak = mealOver + shortOver + wellnessOver + prayingOver;
+130-          if (globalIncludeWc) dailyOverbreak += wcOver;
+131-          if (globalIncludeIdle) dailyOverbreak += idleOver;
+132-        }
+133-
+134:        return {
+135-          ...r,
+136-          breaks: allowedBreaks,
+137-          wcDuration: wcDur,
+138-          idleDuration: idleDur,
+139-          mealDuration: mealDur,
+140-          shortDuration: shortDur,
+141-          wellnessDuration: wellnessDur,
+142-          prayingDuration: prayingDur,
+143-          wcOverbreak: wcOver,
+144-          idleOverbreak: idleOver,
+145-          mealOverbreak: mealOver,
+146-          shortOverbreak: shortOver,
+147-          wellnessOverbreak: wellnessOver,
+148-          prayingOverbreak: prayingOver,
+149-          totalOverbreak: dailyOverbreak
+150-        };
+151-      });
+152-
+153-      const totalOverbreakMinutes = newRecords.reduce((acc, r) => acc + r.totalOverbreak, 0);
+154-      const wcAlerts = newRecords.reduce((acc, r) => acc + (r.wcDuration > 10 ? 1 : 0), 0);
+155-      const idleAlerts = newRecords.reduce((acc, r) => acc + (r.idleDuration > 0 ? 1 : 0), 0);
+156-
+157:      return {
+--
+198-      affectedCount = filteredSummaries.filter(s => s.idleAlerts > 0).length;
+199-      affectedText = "Com Ociosidade";
+200-  } else if (globalTypeFilter === 'idle_overbreak_wc') {
+201-      affectedCount = filteredSummaries.filter(s => s.totalOverbreakMinutes > 0 || (globalIncludeWc && s.wcAlerts > 0) || (globalIncludeIdle && s.idleAlerts > 0)).length;
+202-      affectedText = "COM OVERBREAK";
+203-  } else {
+204-      affectedCount = filteredSummaries.filter(s => s.totalOverbreakMinutes > 0 || s.wcAlerts > 0 || s.idleAlerts > 0).length;
+205-      affectedText = "COM OVERBREAK (Geral)";
+206-  }
+207-
+208-  const isDefaultNoFilters = globalTypeFilter === 'all' && !globalIncludeWc && !globalIncludeIdle;
+209-
+210-  const isWcApplicable = (statusFilterActive && activeStatusFilter && activeStatusFilter.types.includes('wc')) || 
+211-                        (!statusFilterActive && (isDefaultNoFilters || globalIncludeWc));
+212-  const isIdleApplicable = (statusFilterActive && activeStatusFilter && activeStatusFilter.types.includes('idle')) || 
+213-                          (!statusFilterActive && (isDefaultNoFilters || globalIncludeIdle));
+214-  // Not used yet, but good for logic consistency
+215-  // const isOverbreakApplicable = (!statusFilterActive && (isDefaultNoFilters || globalTypeFilter === 'idle_overbreak_wc'));
+216-
+217-  const totalOverbreak = filteredSummaries.reduce((acc, curr) => acc + curr.totalOverbreakMinutes, 0);
+218-  const totalDays = filteredSummaries.reduce((acc, curr) => acc + curr.dailyRecords.length, 0);
+219-  const totalWcMinutes = filteredSummaries.reduce((acc, curr) => 
+220-    acc + curr.dailyRecords.reduce((a, r) => a + r.wcDuration, 0)
+221-  , 0);
+222-  const totalIdleMinutes = filteredSummaries.reduce((acc, curr) => 
+223-    acc + curr.dailyRecords.reduce((a, r) => a + r.idleDuration, 0)
+224-  , 0);
+225-  const totalWcAgents = filteredSummaries.filter(s => s.dailyRecords.some(r => r.wcDuration > 0)).length;
+226-  const totalIdleAgents = filteredSummaries.filter(s => s.idleAlerts > 0).length;
+227-  
+228-  // Metrics for "Precisa de atenção"
+229-  const agentsByOverbreakCount = [...filteredSummaries]
+230-    .map(s => {
+231-      const incidentCount = s.dailyRecords.reduce((acc, r) => {
+232-        const breakIncidents = r.breaks.filter(b => {
+233-          let ideal = (b.type === 'meal') ? 60 : (b.type === 'short') ? 30 : (b.type === 'wellness' || b.type === 'praying') ? 15 : (b.type === 'wc') ? 10 : 0;
+234-          return ideal > 0 && b.durationMinutes > ideal;
+235-        }).length;
+236-        return acc + breakIncidents + (r.idleDuration > 0 ? 1 : 0);
+237-      }, 0);
+238:      return { ...s, incidentCount };
+239-    })
+240-    .filter(s => s.incidentCount > 0)
+241-    .sort((a, b) => b.incidentCount - a.incidentCount)
+242-    .slice(0, 5);
+243-
+244-  const agentsByOverbreakDuration = [...filteredSummaries]
+245-    .filter(s => s.totalOverbreakMinutes > 0)
+246-    .sort((a, b) => b.totalOverbreakMinutes - a.totalOverbreakMinutes)
+247-    .slice(0, 5);
+248-
+249-  const agentsBottom5Special = [...filteredSummaries]
+250-    .filter(s => {
+251-      if (s.isTraining || s.totalOverbreakMinutes === 0) return false;
+252-      if (activeStatusFilter?.id === 'moderation') {
+253-        return s.totalOverbreakMinutes >= 60;
+254-      }
+255-      return true;
+256-    })
+257-    .sort((a, b) => a.totalOverbreakMinutes - b.totalOverbreakMinutes)
+258-    .slice(0, 5);
+259-
+260-  const topProblematic = agentsByOverbreakDuration;
+261-  const topInfrator = topProblematic[0];
+262-
+263-  // Top WC
+264-  const topWc = [...filteredSummaries]
+265-    .map(s => {
+266-      const totalWcOver = s.dailyRecords.reduce((acc, r) => acc + r.wcOverbreak, 0);
+267:      return { ...s, totalWcOver };
+268-    })
+269-    .filter(s => s.wcAlerts > 0 || s.totalWcOver > 0)
+270-    .sort((a, b) => b.totalWcOver - a.totalWcOver || b.wcAlerts - a.wcAlerts)
+271-    .slice(0, 5);
+272-
+273-  // Top Performers
+274-  const topPerformers = [...filteredSummaries]
+275-    .filter(s => !s.isTraining)
+276-    .sort((a, b) => a.totalOverbreakMinutes - b.totalOverbreakMinutes)
+277-    .slice(0, 5);
+278-
+279-  // Top No Overbreaks
+280-  const topNoOverbreaks = [...filteredSummaries]
+281-    .filter(s => !s.isTraining && s.totalOverbreakMinutes === 0)
+282-    .slice(0, 5);
+283-
+284-  const chartData = topProblematic.map(s => {
+285-    const mealOver = s.dailyRecords.reduce((acc, r) => acc + r.mealOverbreak, 0);
+286-    const shortOver = s.dailyRecords.reduce((acc, r) => acc + r.shortOverbreak, 0);
+287-    const wellnessOver = s.dailyRecords.reduce((acc, r) => acc + r.wellnessOverbreak, 0);
+288-    const prayingOver = s.dailyRecords.reduce((acc, r) => acc + r.prayingOverbreak, 0);
+289-    const wcOver = s.dailyRecords.reduce((acc, r) => acc + r.wcOverbreak, 0);
+290-    const idleOver = s.dailyRecords.reduce((acc, r) => acc + r.idleOverbreak, 0);
+291-    
+292-    const mealDur = s.dailyRecords.reduce((acc, r) => acc + r.mealDuration, 0);
+293-    const shortDur = s.dailyRecords.reduce((acc, r) => acc + r.shortDuration, 0);
+294-    const wellnessDur = s.dailyRecords.reduce((acc, r) => acc + r.wellnessDuration, 0);
+295-    const prayingDur = s.dailyRecords.reduce((acc, r) => acc + r.prayingDuration, 0);
+296-    const wcDur = s.dailyRecords.reduce((acc, r) => acc + r.wcDuration, 0);
+297-
+298:    return {
